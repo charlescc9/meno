@@ -3,10 +3,14 @@ use bevy::prelude::*;
 #[derive(Component)]
 struct Particle;
 
-#[derive(Component)]
-struct Position {
-    x: f32,
-    y: f32,
+#[derive(Component, Default)]
+struct Position(Vec3);
+
+#[derive(Bundle, Default)]
+struct ParticleBundle {
+    #[bundle]
+    pbr: PbrBundle,
+    position: Position
 }
 
 struct ParticleTimer(Timer);
@@ -23,16 +27,13 @@ fn create_particles(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>,
          ..default()
     });
     
-    commands.spawn_bundle(PbrBundle { 
-        mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.3, ..default() })),
-        transform: Transform::from_translation(Vec3::new(1.0, 1.0, 0.5)),
-        material: materials.add(Color::rgb(0.0, 0.0, 10.0).into()), ..default() 
-    });
-
-    commands.spawn_bundle(PbrBundle { 
-        mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.1, ..default() })),
-        transform: Transform::from_translation(Vec3::new(0.1, 0.1, 0.3)),
-        material: materials.add(Color::rgb(10.0, 0.0, 0.0).into()), ..default() 
+    commands.spawn_bundle(ParticleBundle { 
+        pbr: PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere { radius: 0.3, ..default() })),
+            transform: Transform::from_translation(Vec3::new(-2.0, 1.0, 0.5)),
+            material: materials.add(Color::rgb(0.0, 0.0, 10.0).into()), ..default() 
+        },
+            position: Position(Vec3::new(-2.0, 1.0, 0.5))
     });
 
     commands.insert_resource(AmbientLight {
@@ -73,16 +74,16 @@ fn create_particles(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>,
         .looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
-
-    commands.spawn().insert(Particle).insert(Position { x: 1.0, y: 1.0 });
-    commands.spawn().insert(Particle).insert(Position { x: 2.0, y: 2.0 });
 }
 
 fn print_position(time: Res<Time>, mut timer: ResMut<ParticleTimer>,
-                  query: Query<&Position, With<Particle>>) {
+                  mut query: Query<(&mut Position, &mut Transform)>) {
     if timer.0.tick(time.delta()).just_finished() {
-        for position in query.iter() {
-            println!("This particle is at position: ({}, {})", position.x, position.y)
+        for (mut position, mut transform) in &mut query {
+            println!("This particle is at position: ({}, {}, {})", 
+                position.0.x, position.0.y, position.0.z);
+            position.0.x += 0.5;
+            transform.translation = position.0;
         }
     }
 }
@@ -91,9 +92,10 @@ struct ParticlePlugin;
 
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ParticleTimer(Timer::from_seconds(3.0, true)))
+        app.insert_resource(ParticleTimer(Timer::from_seconds(1.0, true)))
             .add_startup_system(create_particles)
-            .add_system(print_position);
+            .add_stage_after(CoreStage::Update, 
+                "test", SystemStage::single_threaded().with_system(print_position));
     }
 }
 
