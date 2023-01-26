@@ -1,4 +1,5 @@
 use std::fmt;
+use rand::prelude::*;
 
 #[derive(Debug)]
 struct Point {
@@ -23,21 +24,29 @@ struct Particle {
 
 impl fmt::Display for Particle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Particle {} at position ({}, {})", self.id, self.position.x, self.position.y)
+        write!(f, "Particle {}, position ({:.2}, {:.2})", self.id, self.position.x, self.position.y)
+    }
+}
+
+fn generate_particle(id: u32) -> Particle {
+    let mut gen = rand::thread_rng();
+    Particle {
+        id,
+        mass: gen.gen_range(0.0..100.0),
+        radius: gen.gen_range(0.0..10.0),
+        position: Point { x: gen.gen_range(0.0..100.0), y: gen.gen_range(0.0..100.0) },
+        velocity: Velocity {
+            speed: gen.gen_range(0.0..10.0),
+            direction: Point { x: gen.gen_range(0.0..1.0), y: gen.gen_range(0.0..1.0) },
+        },
     }
 }
 
 fn main() {
-    let particle = Particle {
-        id: 1,
-        mass: 1.0,
-        radius: 1.0,
-        position: Point { x: 1.1, y: 2.2 },
-        velocity: Velocity {
-            speed: 1.0,
-            direction: Point { x: 1.0, y: 1.0 },
-        },
-    };
-
-    println!("{}", particle);
+    let mut particles: Vec<Particle> = Vec::new();
+    for i in 1..=10 {
+        let particle = generate_particle(i);
+        println!("Generating new particle: {}", particle);
+        particles.push(particle);
+    }
 }
