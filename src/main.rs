@@ -26,7 +26,11 @@ impl fmt::Display for Particle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Particle {}:\n\tMass: {:.2}kg\n\tRadius: {:.2}m\n\tPosition: ({:.2}m, {:.2}m)\n\tVelocity: {:.2}m/s, ({:.2}m, {:.2}m)",
+            "Particle {}:
+        Mass: {:.2}kg
+        Radius: {:.2}m
+        Position: ({:.2}m, {:.2}m)
+        Velocity: {:.2}m/s, ({:.2}m, {:.2}m)",
             self.id,
             self.mass,
             self.radius,
@@ -42,12 +46,27 @@ impl fmt::Display for Particle {
 struct Space {
     height: u32,
     width: u32,
-    particles: Vec<Particle>
+    particles: Vec<Particle>,
 }
 
 impl fmt::Display for Space {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "test")
+        let positions: Vec<&Point> = self.particles.iter().map(|p| &p.position).collect();
+        writeln!(f, "_________________________________________").unwrap();
+        for i in 0..self.height {
+            for j in 0..self.width {
+                let any_local = positions.iter().any(|p| {
+                    p.y > i as f64 && p.y < (i + 1) as f64 && p.x > j as f64 && p.x < (j + 1) as f64
+                });
+                if any_local {
+                    write!(f, "| . ").unwrap();
+                } else {
+                    write!(f, "|   ").unwrap();
+                }
+            }
+            write!(f, "|\n").unwrap();
+        }
+        write!(f, "-----------------------------------------")
     }
 }
 
@@ -58,8 +77,8 @@ fn generate_particle(id: u32) -> Particle {
         mass: gen.gen_range(0.0..100.0),
         radius: gen.gen_range(0.0..10.0),
         position: Point {
-            x: gen.gen_range(0.0..100.0),
-            y: gen.gen_range(0.0..100.0),
+            x: gen.gen_range(0.0..10.0),
+            y: gen.gen_range(0.0..10.0),
         },
         velocity: Velocity {
             speed: gen.gen_range(0.0..10.0),
@@ -77,13 +96,13 @@ fn main() {
         let particle = generate_particle(i);
         println!("Generating new particle:\n  {}", particle);
         particles.push(particle);
-    };
+    }
 
     let space = Space {
         height: 10,
         width: 10,
-        particles: particles
+        particles: particles,
     };
 
-    println!("Space: {}", space)
+    println!("{}", space)
 }
