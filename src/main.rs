@@ -1,5 +1,5 @@
 use rand::prelude::*;
-use std::fmt;
+use std::{fmt, thread, time};
 
 #[derive(Debug)]
 struct Point {
@@ -43,6 +43,25 @@ impl fmt::Display for Particle {
     }
 }
 
+impl Particle {
+    fn update(&mut self) -> () {
+        self.position.x += self.velocity.speed * self.velocity.direction.x;
+        if self.position.x < 0.0 {
+            self.position.x = 10.0;
+        }
+        if self.position.x > 10.0 {
+            self.position.x = 0.0;
+        }
+        self.position.y += self.velocity.speed * self.velocity.direction.y;
+        if self.position.y < 0.0 {
+            self.position.y = 10.0;
+        }
+        if self.position.y > 10.0 {
+            self.position.y = 0.0;
+        }
+    }
+}
+
 struct Space {
     height: u32,
     width: u32,
@@ -70,7 +89,7 @@ impl fmt::Display for Space {
     }
 }
 
-fn generate_particle(id: u32) -> Particle {
+fn create_particle(id: u32) -> Particle {
     let mut gen = rand::thread_rng();
     Particle {
         id,
@@ -81,28 +100,37 @@ fn generate_particle(id: u32) -> Particle {
             y: gen.gen_range(0.0..10.0),
         },
         velocity: Velocity {
-            speed: gen.gen_range(0.0..10.0),
+            speed: gen.gen_range(0.0..1.0),
             direction: Point {
-                x: gen.gen_range(0.0..1.0),
-                y: gen.gen_range(0.0..1.0),
+                x: gen.gen_range(-1.0..1.0),
+                y: gen.gen_range(-1.0..1.0),
             },
         },
     }
 }
 
 fn main() {
+    // Create particles
     let mut particles: Vec<Particle> = Vec::new();
     for i in 1..=10 {
-        let particle = generate_particle(i);
-        println!("Generating new particle:\n  {}", particle);
+        let particle = create_particle(i);
         particles.push(particle);
     }
 
-    let space = Space {
+    // Initialize space
+    let mut space = Space {
         height: 10,
         width: 10,
         particles: particles,
     };
+    println!("{}", space);
 
-    println!("{}", space)
+    // Move particles
+    loop {
+        for particle in &mut space.particles {
+            particle.update();
+        }
+        println!("{}", space);
+        thread::sleep(time::Duration::from_millis(100));
+    }
 }
