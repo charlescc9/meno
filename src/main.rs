@@ -1,5 +1,8 @@
 use rand::prelude::*;
-use std::{fmt, thread, time};
+use std::{
+    f64::{self, consts::PI},
+    fmt, thread, time,
+};
 
 #[derive(Debug)]
 struct Point {
@@ -44,19 +47,51 @@ impl fmt::Display for Particle {
 }
 
 impl Particle {
-    fn update(&mut self) -> () {
+    fn new(
+        gen: &mut ThreadRng,
+        id: u32,
+        width: u32,
+        height: u32,
+        max_mass: f64,
+        max_radius: f64,
+        max_speed: f64,
+    ) -> Self {
+        Particle {
+            id,
+            mass: gen.gen_range(0.0..max_mass),
+            radius: gen.gen_range(0.0..max_radius),
+            position: Point {
+                x: gen.gen_range(0.0..width as f64),
+                y: gen.gen_range(0.0..height as f64),
+            },
+            velocity: Velocity {
+                speed: gen.gen_range(0.0..max_speed),
+                direction: Particle::get_random_direction(gen),
+            },
+        }
+    }
+
+    fn get_random_direction(gen: &mut ThreadRng) -> Point {
+        let theta = 2.0 * PI * gen.gen_range(0.0..1.0);
+        Point {
+            x: theta.sin(),
+            y: theta.cos(),
+        }
+    }
+
+    fn update_position(&mut self, width: u32, height: u32) -> () {
         self.position.x += self.velocity.speed * self.velocity.direction.x;
         if self.position.x < 0.0 {
-            self.position.x = 10.0;
+            self.position.x = width as f64;
         }
-        if self.position.x > 10.0 {
+        if self.position.x > width as f64 {
             self.position.x = 0.0;
         }
         self.position.y += self.velocity.speed * self.velocity.direction.y;
         if self.position.y < 0.0 {
-            self.position.y = 10.0;
+            self.position.y = height as f64;
         }
-        if self.position.y > 10.0 {
+        if self.position.y > height as f64 {
             self.position.y = 0.0;
         }
     }
@@ -89,38 +124,27 @@ impl fmt::Display for Space {
     }
 }
 
-fn create_particle(id: u32) -> Particle {
-    let mut gen = rand::thread_rng();
-    Particle {
-        id,
-        mass: gen.gen_range(0.0..100.0),
-        radius: gen.gen_range(0.0..10.0),
-        position: Point {
-            x: gen.gen_range(0.0..10.0),
-            y: gen.gen_range(0.0..10.0),
-        },
-        velocity: Velocity {
-            speed: gen.gen_range(0.0..1.0),
-            direction: Point {
-                x: gen.gen_range(-1.0..1.0),
-                y: gen.gen_range(-1.0..1.0),
-            },
-        },
-    }
-}
-
 fn main() {
+    // Global variables
+    let mut gen = rand::thread_rng();
+    let width = 10;
+    let height = 10;
+    let max_mass = 10.0;
+    let max_radius = 10.0;
+    let max_speed = 1.0;
+    let num_partiles = 10;
+
     // Create particles
     let mut particles: Vec<Particle> = Vec::new();
-    for i in 1..=10 {
-        let particle = create_particle(i);
+    for i in 0..num_partiles {
+        let particle = Particle::new(&mut gen, i, width, height, max_mass, max_radius, max_speed);
         particles.push(particle);
     }
 
     // Initialize space
     let mut space = Space {
-        height: 10,
-        width: 10,
+        height: height,
+        width: width,
         particles: particles,
     };
     println!("{}", space);
@@ -128,7 +152,7 @@ fn main() {
     // Move particles
     loop {
         for particle in &mut space.particles {
-            particle.update();
+            particle.update_position(width, height);
         }
         println!("{}", space);
         thread::sleep(time::Duration::from_millis(100));
