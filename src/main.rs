@@ -1,3 +1,4 @@
+use clap::Parser;
 use rand::prelude::*;
 use std::{
     f64::{self, consts::PI},
@@ -20,7 +21,6 @@ struct Velocity {
 struct Particle {
     id: u32,
     mass: f64,
-    radius: f64,
     position: Point,
     velocity: Velocity,
 }
@@ -31,12 +31,10 @@ impl fmt::Display for Particle {
             f,
             "Particle {}:
         Mass: {:.2}kg
-        Radius: {:.2}m
         Position: ({:.2}m, {:.2}m)
         Velocity: {:.2}m/s, ({:.2}m, {:.2}m)",
             self.id,
             self.mass,
-            self.radius,
             self.position.x,
             self.position.y,
             self.velocity.speed,
@@ -53,13 +51,11 @@ impl Particle {
         width: u32,
         height: u32,
         max_mass: f64,
-        max_radius: f64,
         max_speed: f64,
     ) -> Self {
         Particle {
             id,
             mass: gen.gen_range(0.0..max_mass),
-            radius: gen.gen_range(0.0..max_radius),
             position: Point {
                 x: gen.gen_range(0.0..width as f64),
                 y: gen.gen_range(0.0..height as f64),
@@ -106,7 +102,7 @@ struct Space {
 impl fmt::Display for Space {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let positions: Vec<&Point> = self.particles.iter().map(|p| &p.position).collect();
-        writeln!(f, "_________________________________________").unwrap();
+        writeln!(f, "{}", "_".repeat(self.width as usize * 4 + 1)).unwrap();
         for i in 0..self.height {
             for j in 0..self.width {
                 let any_local = positions.iter().any(|p| {
@@ -120,31 +116,51 @@ impl fmt::Display for Space {
             }
             write!(f, "|\n").unwrap();
         }
-        write!(f, "-----------------------------------------")
+        writeln!(f, "{}", "-".repeat(self.width as usize * 4 + 1))
     }
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short = 't', long, default_value_t = 10)]
+    height: u32,
+
+    #[arg(short, long, default_value_t = 10)]
+    width: u32,
+
+    #[arg(short, long, default_value_t = 10)]
+    num_partiles: u32,
+
+    #[arg(short, long, default_value_t = 10.0)]
+    max_mass: f64,
+
+    #[arg(short = 's', long, default_value_t = 1.0)]
+    max_speed: f64,
+}
+
 fn main() {
-    // Global variables
-    let mut gen = rand::thread_rng();
-    let width = 10;
-    let height = 10;
-    let max_mass = 10.0;
-    let max_radius = 10.0;
-    let max_speed = 1.0;
-    let num_partiles = 10;
+    let args = Args::parse();
+    println!("Running Meno with the following {:?}", args);
 
     // Create particles
     let mut particles: Vec<Particle> = Vec::new();
-    for i in 0..num_partiles {
-        let particle = Particle::new(&mut gen, i, width, height, max_mass, max_radius, max_speed);
+    for i in 0..args.num_partiles {
+        let particle = Particle::new(
+            &mut rand::thread_rng(),
+            i,
+            args.width,
+            args.height,
+            args.max_mass,
+            args.max_speed,
+        );
         particles.push(particle);
     }
 
     // Initialize space
     let mut space = Space {
-        height: height,
-        width: width,
+        height: args.height,
+        width: args.width,
         particles: particles,
     };
     println!("{}", space);
@@ -152,7 +168,7 @@ fn main() {
     // Move particles
     loop {
         for particle in &mut space.particles {
-            particle.update_position(width, height);
+            particle.update_position(args.width, args.height);
         }
         println!("{}", space);
         thread::sleep(time::Duration::from_millis(100));
