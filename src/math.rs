@@ -25,11 +25,13 @@ pub fn get_gravitational_potential(
     let source_particle = particles.get(source_idx).unwrap();
 
     for i in 0..particles.len() {
-        let particle = particles.get(i).unwrap();
-        let radius = get_euclidean_distance(&source_particle.position, &particle.position);
-        let potential = (gravity * source_particle.mass) / radius.powi(2);
-        potentials.push(potential);
+        if i != source_idx {
+            let particle = particles.get(i).unwrap();
+            let radius = get_euclidean_distance(&source_particle.position, &particle.position);
+            let potential = (gravity * source_particle.mass) / radius.powi(2);
+            potentials.push(potential);
+        }
     }
-
+    
     return potentials.iter().sum();
 }

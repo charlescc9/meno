@@ -12,21 +12,22 @@ pub struct Space {
 
 impl fmt::Display for Space {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "{}", "-".repeat(self.width as usize * 4 + 1)).unwrap();
+
         let positions: Vec<&Point> = self.particles.iter().map(|p| &p.position).collect();
-        writeln!(f, "{}", "_".repeat(self.width as usize * 4 + 1)).unwrap();
         for i in 0..self.height {
             for j in 0..self.width {
-                let any_local = positions.iter().any(|p| {
-                    p.y > i as f64 && p.y < (i + 1) as f64 && p.x > j as f64 && p.x < (j + 1) as f64
-                });
-                if any_local {
-                    write!(f, "| . ").unwrap();
+                let point_at_location = positions.iter().enumerate().find(|(_, p)| 
+                p.y > i as f64 && p.y < (i + 1) as f64 && p.x > j as f64 && p.x < (j + 1) as f64 );
+                if let Some((i, _)) = point_at_location {
+                    write!(f, "| {} ", i).unwrap();
                 } else {
                     write!(f, "|   ").unwrap();
                 }
             }
             write!(f, "|\n").unwrap();
         }
+        
         writeln!(f, "{}", "-".repeat(self.width as usize * 4 + 1))
     }
 }
