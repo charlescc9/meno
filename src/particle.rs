@@ -11,7 +11,6 @@ pub struct Particle {
     pub mass: f64,
     pub position: Point,
     pub velocity: Vector,
-    pub gravitational_potential: f64,
 }
 
 impl Particle {
@@ -34,11 +33,14 @@ impl Particle {
                 magnitude: gen.gen_range(0.0..max_speed),
                 direction: get_random_direction(gen),
             },
-            gravitational_potential: 0.0,
         }
     }
 
-    pub fn update(&mut self, width: u32, height: u32, gravitational_potential: f64) -> () {
+    pub fn update(&mut self, width: u32, height: u32, gravitational_force: Vector) -> () {
+        // Todo: solve n-body problem here
+
+        println!("Gravitational force: {:?}", gravitational_force);
+
         self.position.x += self.velocity.magnitude * self.velocity.direction.x;
         if self.position.x < 0.0 {
             self.position.x = width as f64;
@@ -54,8 +56,6 @@ impl Particle {
         if self.position.y > height as f64 {
             self.position.y = 0.0;
         }
-
-        self.gravitational_potential = gravitational_potential;
     }
 }
 
