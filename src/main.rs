@@ -1,8 +1,7 @@
 mod math;
 mod particle;
-mod point;
+mod components;
 mod space;
-mod vector;
 
 use clap::Parser;
 use std::{f64, thread, time};

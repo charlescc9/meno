@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub struct Point {
+pub struct Components {
     pub x: f64,
     pub y: f64,
 }

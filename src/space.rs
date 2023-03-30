@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::particle::Particle;
-use crate::point::Point;
+use crate::components::Components;
 
 #[derive(Debug)]
 pub struct Space {
@@ -16,7 +16,7 @@ impl fmt::Display for Space {
         writeln!(f, "Space at time {}", self.time)?;
         writeln!(f, "{}", "-".repeat(self.width as usize * 4 + 1))?;
 
-        let positions: Vec<&Point> = self.particles.iter().map(|p| &p.position).collect();
+        let positions: Vec<&Components> = self.particles.iter().map(|p| &p.position).collect();
         for i in 0..self.height {
             for j in 0..self.width {
                 let point_at_location = positions.iter().enumerate().find(|(_, p)| {
