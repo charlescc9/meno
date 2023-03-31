@@ -34,7 +34,7 @@ impl Particle {
         }
     }
 
-    pub fn update(&mut self, width: u32, height: u32, gravitational_force: Components) -> () {
+    pub fn update(&mut self, width: u32, height: u32, gravitational_force: &Components) -> () {
         let acceleration_x = gravitational_force.x / self.mass;
         let acceleration_y = gravitational_force.y / self.mass;
 
@@ -43,7 +43,7 @@ impl Particle {
 
         self.position.x += self.velocity.x;
         self.position.y += self.velocity.y;
-        
+
         // Check bounds
         if self.position.x < 0.0 {
             self.position.x = width as f64;
@@ -68,12 +68,7 @@ impl fmt::Display for Particle {
         Mass: {:.2}kg
         Position: ({:.2}m, {:.2}m)
         Velocity: ({:.2}m/s, {:.2}m/s)",
-            self.id,
-            self.mass,
-            self.position.x,
-            self.position.y,
-            self.velocity.x,
-            self.velocity.y
+            self.id, self.mass, self.position.x, self.position.y, self.velocity.x, self.velocity.y
         )
     }
 }

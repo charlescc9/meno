@@ -1,6 +1,6 @@
+mod components;
 mod math;
 mod particle;
-mod components;
 mod space;
 
 use clap::Parser;
@@ -8,6 +8,8 @@ use std::{f64, thread, time};
 
 use particle::Particle;
 use space::Space;
+
+use crate::components::Components;
 
 const G: f64 = 6.67430e-11f64;
 
@@ -61,15 +63,26 @@ fn main() {
 
     // Update particles
     loop {
+        // Get gravitational force on each particle
+        let mut forces: Vec<Components> = Vec::new();
         for i in 0..space.particles.len() {
-            let gravitational_force = math::get_gravitational_force(&space.particles, i, G);
+            forces.push(math::get_gravitational_force(&space.particles, i, G));
+        }
 
+        // Update particles
+        for i in 0..space.particles.len() {
             space.particles.get_mut(i).unwrap().update(
                 args.width,
                 args.height,
-                gravitational_force,
+                forces.get(i).unwrap(),
             );
         }
+
+        // Calculate energy
+        let kinetic_energy = math::get_kinetic_energy(&space.particles);
+        let potential_energy = math::get_gravitational_potential_energy(&space.particles, G);
+        let total_energy = kinetic_energy - potential_energy;
+        println!("Total energy: {:.4}", total_energy);
 
         println!("{}", space);
         space.time += 1;
