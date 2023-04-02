@@ -6,6 +6,7 @@ mod space;
 use clap::Parser;
 use std::{f64, thread, time};
 
+use meno::run;
 use particle::Particle;
 use space::Space;
 
@@ -32,11 +33,14 @@ struct Args {
     max_speed: f64,
 }
 
-fn main() {
-    // Todo: Compute totoal momentum and ensure that it is conserved
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init();
 
     let args = Args::parse();
     println!("Running Meno with the following {:?}", args);
+
+    run().await;
 
     // Create particles
     let mut particles: Vec<Particle> = Vec::new();
@@ -83,6 +87,10 @@ fn main() {
         let potential_energy = math::get_gravitational_potential_energy(&space.particles, G);
         let total_energy = kinetic_energy - potential_energy;
         println!("Total energy: {:.4}", total_energy);
+
+        // Calculate momentum
+        let momentum = math::get_momentum(&space.particles);
+        println!("Momentum: {:.4}", momentum);
 
         println!("{}", space);
         space.time += 1;

@@ -58,3 +58,12 @@ pub fn get_kinetic_energy(particles: &Vec<Particle>) -> f64 {
 
     0.5 * energies
 }
+
+pub fn get_momentum(particles: &Vec<Particle>) -> f64 {
+    // p = mv
+
+    particles
+        .iter()
+        .map(|p| p.mass * (p.velocity.x + p.velocity.y))
+        .sum()
+}
