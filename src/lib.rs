@@ -1,9 +1,48 @@
-use wgpu::{Device, Queue, RenderPipelineDescriptor, Surface, SurfaceConfiguration};
+use wgpu::{
+    util::DeviceExt, Device, Queue, RenderPipelineDescriptor, Surface, SurfaceConfiguration,
+};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    color: [f32; 3],
+}
+
+const VERTICES: &[Vertex] = &[
+    Vertex {
+        position: [0.0, 0.5, 0.0],
+        color: [1.0, 0.0, 0.0],
+    },
+    Vertex {
+        position: [-0.5, -0.5, 0.0],
+        color: [0.0, 1.0, 0.0],
+    },
+    Vertex {
+        position: [0.5, -0.5, 0.0],
+        color: [0.0, 0.0, 1.0],
+    },
+];
+
+impl Vertex {
+    const ATTRIBS: [wgpu::VertexAttribute; 2] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        use std::mem;
+
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<Self>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBS,
+        }
+    }
+}
 
 struct State {
     surface: Surface,
@@ -14,6 +53,7 @@ struct State {
     window: Window,
     color: wgpu::Color,
     render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
 }
 
 impl State {
@@ -48,6 +88,12 @@ impl State {
             .await
             .unwrap();
 
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
             .formats
@@ -69,9 +115,9 @@ impl State {
         surface.configure(&device, &config);
 
         let color = wgpu::Color {
-            r: 0.1,
-            g: 0.2,
-            b: 0.3,
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
             a: 1.0,
         };
 
@@ -89,7 +135,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[],
+                buffers: &[Vertex::desc()],
             },
 
             fragment: Some(wgpu::FragmentState {
@@ -130,6 +176,7 @@ impl State {
             size,
             color,
             render_pipeline,
+            vertex_buffer,
         }
     }
 
@@ -153,12 +200,13 @@ impl State {
                 position,
                 modifiers: _,
             } => {
-                let r = position.x / self.size.width as f64;
-                let g = position.y / self.size.height as f64;
+                let x_fraction = position.x / self.size.width as f64;
+                let y_fraction = position.y / self.size.height as f64;
+                let color_fraction = (x_fraction + y_fraction) / 2.0;
                 self.color = wgpu::Color {
-                    r,
-                    g,
-                    b: 0.5,
+                    r: color_fraction,
+                    g: color_fraction,
+                    b: color_fraction,
                     a: 1.0,
                 };
             }
@@ -195,6 +243,7 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.draw(0..3, 0..1);
         }
 
@@ -236,7 +285,6 @@ pub async fn run() {
                         state.resize(*physical_size);
                     }
                     WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        // new_inner_size is &&mut so we have to dereference it twice
                         state.resize(**new_inner_size);
                     }
                     _ => {}
@@ -247,17 +295,12 @@ pub async fn run() {
             state.update();
             match state.render() {
                 Ok(_) => {}
-                // Reconfigure the surface if lost
                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                // The system is out of memory, we should probably quit
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                // All other errors (Outdated, Timeout) should be resolved by the next frame
                 Err(e) => eprintln!("{:?}", e),
             }
         }
         Event::MainEventsCleared => {
-            // RedrawRequested will only trigger once, unless we manually
-            // request it.
             state.window().request_redraw();
         }
         _ => {}
