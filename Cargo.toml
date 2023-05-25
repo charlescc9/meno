@@ -5,12 +5,12 @@ edition = "2021"
 description = "A fundamental physics simulator"
 
 [dependencies]
-clap = { version = "4.1.4", features = ["derive"] }
-rand = "0.8.5"
-tracing = "0.1.37"
-tracing-subscriber = "0.3.16"
-wgpu = "0.15.1"
-winit = "0.28.3"
+clap = { version = "4", features = ["derive"] }
+rand = "0"
+tracing = "0"
+tracing-subscriber = "0"
+wgpu = "0"
+winit = "0"
 tokio = { version = "1", features = ["full"] }
-bytemuck = { version = "1.13.1", features = ["derive"] }
-cgmath = "0.18.0"
+bytemuck = { version = "1", features = ["derive"] }
+cgmath = "0"
