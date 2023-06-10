@@ -22,14 +22,28 @@ impl Simulation {
         let mut collider_set = ColliderSet::new();
         let mut rigid_body_handles = Vec::new();
 
-        let collider = ColliderBuilder::cuboid(100.0, 0.1)
-            .translation(vector![0.0, -1.1])
+        // Make sides of window colliders
+        let top = ColliderBuilder::cuboid(1.0, 1.0)
+            .translation(vector![0.0, 2.0])
             .build();
-        collider_set.insert(collider);
+        collider_set.insert(top);
+        let right = ColliderBuilder::cuboid(1.0, 1.0)
+            .translation(vector![2.0, 0.0])
+            .build();
+        collider_set.insert(right);
+        let bottom = ColliderBuilder::cuboid(1.0, 1.0)
+            .translation(vector![0.0, -2.0])
+            .build();
+        collider_set.insert(bottom);
+        let left = ColliderBuilder::cuboid(1.0, 1.0)
+            .translation(vector![-2.0, 0.0])
+            .build();
+        collider_set.insert(left);
 
         for particle in particles {
             let rigid_body = RigidBodyBuilder::dynamic()
                 .translation(vector![particle.position[0], particle.position[1]])
+                .linvel(vector![particle.velocity[0], particle.velocity[1]])
                 .build();
             let rigid_body_handle = rigid_body_set.insert(rigid_body);
             let collider = ColliderBuilder::ball(particle_radius)
@@ -44,7 +58,7 @@ impl Simulation {
             collider_set,
             rigid_body_handles,
             physics_pipeline: PhysicsPipeline::new(),
-            gravity: -0.81,
+            gravity: 0.0,
             integration_parameters: IntegrationParameters::default(),
             island_manager: IslandManager::new(),
             broad_phase: BroadPhase::new(),

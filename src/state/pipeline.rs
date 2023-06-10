@@ -142,8 +142,13 @@ impl Pipeline {
         for i in 0..simulation.rigid_body_handles.len() {
             let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
             particles[i].position[0] = rigid_body.translation().x;
+            if particles[i].position[0] > 1.0 {
+                particles[i].position[0] -= 2.0;
+            }
             particles[i].position[1] = rigid_body.translation().y;
-            println!("Ball altitude: {}", rigid_body.translation().y);
+            if particles[i].position[1] > 1.0 {
+                particles[i].position[1] -= 2.0;
+            }
         }
 
         device
