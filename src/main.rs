@@ -4,7 +4,7 @@ mod state;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short = 'n', long, default_value_t = 10)]
+    #[arg(short = 'n', long, default_value_t = 2)]
     num_particles: u32,
 
     #[arg(short = 'r', long, default_value_t = 0.1)]

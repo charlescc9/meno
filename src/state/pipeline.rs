@@ -139,17 +139,20 @@ impl Pipeline {
             &(),
         );
 
+        let mut total_p = 0.0;
         for i in 0..simulation.rigid_body_handles.len() {
             let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
             particles[i].position[0] = rigid_body.translation().x;
-            if particles[i].position[0] > 1.0 {
-                particles[i].position[0] -= 2.0;
-            }
             particles[i].position[1] = rigid_body.translation().y;
-            if particles[i].position[1] > 1.0 {
-                particles[i].position[1] -= 2.0;
-            }
+
+            let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
+            println!("mass: {:?}", rigid_body.mass());
+            println!("linvel: {}", rigid_body.linvel().magnitude());
+            println!("angvel: {}", rigid_body.angvel());
+            println!("kinetic enegery: {}", rigid_body.kinetic_energy());
+            total_p += rigid_body.linvel().magnitude();
         }
+        println!("Total: {}\n", total_p);
 
         device
             .queue

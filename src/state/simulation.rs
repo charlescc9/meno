@@ -25,18 +25,26 @@ impl Simulation {
         // Make sides of window colliders
         let top = ColliderBuilder::cuboid(1.0, 1.0)
             .translation(vector![0.0, 2.0])
+            .friction(0.0)
+            .restitution(1.0)
             .build();
         collider_set.insert(top);
         let right = ColliderBuilder::cuboid(1.0, 1.0)
             .translation(vector![2.0, 0.0])
+            .friction(0.0)
+            .restitution(1.0)
             .build();
         collider_set.insert(right);
         let bottom = ColliderBuilder::cuboid(1.0, 1.0)
             .translation(vector![0.0, -2.0])
+            .friction(0.0)
+            .restitution(1.0)
             .build();
         collider_set.insert(bottom);
         let left = ColliderBuilder::cuboid(1.0, 1.0)
             .translation(vector![-2.0, 0.0])
+            .friction(0.0)
+            .restitution(1.0)
             .build();
         collider_set.insert(left);
 
@@ -44,10 +52,13 @@ impl Simulation {
             let rigid_body = RigidBodyBuilder::dynamic()
                 .translation(vector![particle.position[0], particle.position[1]])
                 .linvel(vector![particle.velocity[0], particle.velocity[1]])
+                .lock_rotations()
+                .additional_mass(100.0)
                 .build();
             let rigid_body_handle = rigid_body_set.insert(rigid_body);
             let collider = ColliderBuilder::ball(particle_radius)
                 .restitution(1.0)
+                // .mass(0.0)
                 .build();
             collider_set.insert_with_parent(collider, rigid_body_handle, &mut rigid_body_set);
             rigid_body_handles.push(rigid_body_handle);
