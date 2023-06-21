@@ -2,12 +2,12 @@ use super::device;
 use super::particle;
 use super::simulation;
 use super::vertex;
-use rapier2d::prelude::*;
 use wgpu::util::DeviceExt;
 
 pub struct Pipeline {
     num_particles: u32,
     num_indices: u32,
+    particles_raw: Vec<particle::ParticleRaw>,
     particle_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -18,15 +18,17 @@ impl Pipeline {
     fn create_buffers(
         device: &device::Device,
         particles: &Vec<particle::Particle>,
-        vertices: &Vec<vertex::Vertex>,
+        particles_raw: &mut Vec<particle::ParticleRaw>,
+        vertices: &Vec<vertex::VertexRaw>,
         indices: &Vec<u32>,
     ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
+        particle::ParticleRaw::convert(particles, particles_raw);
         (
             device
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Particle Buffer"),
-                    contents: bytemuck::cast_slice(&particles),
+                    contents: bytemuck::cast_slice(particles_raw),
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 }),
             device
@@ -68,7 +70,7 @@ impl Pipeline {
                 attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
             },
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<vertex::Vertex>() as wgpu::BufferAddress,
+                array_stride: std::mem::size_of::<vertex::VertexRaw>() as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &wgpu::vertex_attr_array![2 => Float32x3, 3 => Float32x3],
             },
@@ -99,17 +101,19 @@ impl Pipeline {
 
     pub fn new(
         particles: &Vec<particle::Particle>,
-        vertices: &Vec<vertex::Vertex>,
+        vertices: &Vec<vertex::VertexRaw>,
         indices: &Vec<u32>,
         device: &device::Device,
     ) -> Self {
+        let mut particles_raw = Vec::new();
         let (particle_buffer, vertex_buffer, index_buffer) =
-            Pipeline::create_buffers(&device, &particles, &vertices, &indices);
+            Pipeline::create_buffers(&device, &particles, &mut particles_raw, &vertices, &indices);
         let render_pipeline = Pipeline::create_render_pipeline(&device);
 
         Self {
             num_particles: particles.len() as u32,
             num_indices: indices.len() as u32,
+            particles_raw,
             particle_buffer,
             vertex_buffer,
             index_buffer,
@@ -117,43 +121,15 @@ impl Pipeline {
         }
     }
 
-    pub fn update(
-        &self,
-        particles: &mut Vec<particle::Particle>,
-        device: &device::Device,
-        simulation: &mut simulation::Simulation,
-    ) {
-        simulation.physics_pipeline.step(
-            &vector![0.0, simulation.gravity],
-            &simulation.integration_parameters,
-            &mut simulation.island_manager,
-            &mut simulation.broad_phase,
-            &mut simulation.narrow_phase,
-            &mut simulation.rigid_body_set,
-            &mut simulation.collider_set,
-            &mut simulation.impulse_joint_set,
-            &mut simulation.multibody_joint_set,
-            &mut simulation.ccd_solver,
-            None,
-            &(),
-            &(),
+    pub fn update(&mut self, particles: &mut Vec<particle::Particle>, device: &device::Device) {
+        simulation::step(particles);
+
+        particle::ParticleRaw::convert(particles, &mut self.particles_raw);
+        device.queue.write_buffer(
+            &self.particle_buffer,
+            0,
+            bytemuck::cast_slice(&self.particles_raw),
         );
-
-        for i in 0..simulation.rigid_body_handles.len() {
-            let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
-            particles[i].position[0] = rigid_body.translation().x;
-            if particles[i].position[0] > 1.0 {
-                particles[i].position[0] -= 2.0;
-            }
-            particles[i].position[1] = rigid_body.translation().y;
-            if particles[i].position[1] > 1.0 {
-                particles[i].position[1] -= 2.0;
-            }
-        }
-
-        device
-            .queue
-            .write_buffer(&self.particle_buffer, 0, bytemuck::cast_slice(&particles));
     }
 
     pub fn render(&self, device: &device::Device) -> Result<(), wgpu::SurfaceError> {

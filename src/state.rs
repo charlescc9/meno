@@ -8,7 +8,6 @@ pub struct State {
     event_loop: winit::event_loop::EventLoop<()>,
     window: winit::window::Window,
     particles: Vec<particle::Particle>,
-    simulation: simulation::Simulation,
     device: device::Device,
     pipeline: pipeline::Pipeline,
 }
@@ -20,16 +19,15 @@ impl State {
             .build(&event_loop)
             .unwrap();
         let particles = particle::Particle::create_particles(num_particles);
-        let (vertices, indices) = vertex::Vertex::create_particles(particle_radius, particle_sides);
+        let (vertices, indices) =
+            vertex::VertexRaw::create_particles_vertices(particle_radius, particle_sides);
         let device = device::Device::new(&window).await;
-        let simulation = simulation::Simulation::new(&particles, particle_radius);
         let pipeline = pipeline::Pipeline::new(&particles, &vertices, &indices, &device);
 
         State {
             window,
             event_loop,
             particles,
-            simulation,
             device,
             pipeline,
         }
@@ -60,8 +58,7 @@ impl State {
                 winit::event::Event::RedrawRequested(window_id)
                     if window_id == self.window.id() =>
                 {
-                    self.pipeline
-                        .update(&mut self.particles, &self.device, &mut self.simulation);
+                    self.pipeline.update(&mut self.particles, &self.device);
                     match self.pipeline.render(&self.device) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
