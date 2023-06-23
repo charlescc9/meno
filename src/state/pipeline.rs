@@ -1,28 +1,28 @@
 use super::device;
-use super::particle;
+use super::shader_types;
 use super::simulation;
-use super::vertex;
 use wgpu::util::DeviceExt;
 
 pub struct Pipeline {
     num_particles: u32,
     num_indices: u32,
-    particles_raw: Vec<particle::ParticleRaw>,
+    particles_raw: Vec<shader_types::ParticleRaw>,
     particle_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
+    simulation: simulation::Simulation,
 }
 
 impl Pipeline {
     fn create_buffers(
         device: &device::Device,
-        particles: &Vec<particle::Particle>,
-        particles_raw: &mut Vec<particle::ParticleRaw>,
-        vertices: &Vec<vertex::VertexRaw>,
+        particles: &Vec<simulation::Particle>,
+        particles_raw: &mut Vec<shader_types::ParticleRaw>,
+        vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
     ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
-        particle::ParticleRaw::convert(particles, particles_raw);
+        shader_types::ParticleRaw::convert(particles, particles_raw);
         (
             device
                 .device
@@ -65,12 +65,13 @@ impl Pipeline {
                 });
         let vertex_buffer_layout = &[
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<particle::Particle>() as wgpu::BufferAddress,
+                array_stride: std::mem::size_of::<shader_types::ParticleRaw>()
+                    as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Instance,
                 attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
             },
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<vertex::VertexRaw>() as wgpu::BufferAddress,
+                array_stride: std::mem::size_of::<shader_types::VertexRaw>() as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &wgpu::vertex_attr_array![2 => Float32x3, 3 => Float32x3],
             },
@@ -100,31 +101,37 @@ impl Pipeline {
     }
 
     pub fn new(
-        particles: &Vec<particle::Particle>,
-        vertices: &Vec<vertex::VertexRaw>,
+        simulation: simulation::Simulation,
+        vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
         device: &device::Device,
     ) -> Self {
         let mut particles_raw = Vec::new();
-        let (particle_buffer, vertex_buffer, index_buffer) =
-            Pipeline::create_buffers(&device, &particles, &mut particles_raw, &vertices, &indices);
+        let (particle_buffer, vertex_buffer, index_buffer) = Pipeline::create_buffers(
+            &device,
+            &simulation.particles,
+            &mut particles_raw,
+            &vertices,
+            &indices,
+        );
         let render_pipeline = Pipeline::create_render_pipeline(&device);
 
         Self {
-            num_particles: particles.len() as u32,
+            num_particles: simulation.particles.len() as u32,
             num_indices: indices.len() as u32,
             particles_raw,
             particle_buffer,
             vertex_buffer,
             index_buffer,
             render_pipeline,
+            simulation,
         }
     }
 
-    pub fn update(&mut self, particles: &mut Vec<particle::Particle>, device: &device::Device) {
-        simulation::step(particles);
+    pub fn update(&mut self, device: &device::Device) {
+        self.simulation.step();
 
-        particle::ParticleRaw::convert(particles, &mut self.particles_raw);
+        shader_types::ParticleRaw::convert(&self.simulation.particles, &mut self.particles_raw);
         device.queue.write_buffer(
             &self.particle_buffer,
             0,

@@ -1,33 +1,35 @@
 mod device;
-mod particle;
 mod pipeline;
+mod shader_types;
 mod simulation;
-mod vertex;
 
 pub struct State {
     event_loop: winit::event_loop::EventLoop<()>,
     window: winit::window::Window,
-    particles: Vec<particle::Particle>,
     device: device::Device,
     pipeline: pipeline::Pipeline,
 }
 
 impl State {
-    pub async fn new(num_particles: u32, particle_radius: f32, particle_sides: u32) -> Self {
+    pub async fn new(
+        num_particles: u32,
+        particle_mass: f32,
+        particle_radius: f32,
+        particle_sides: u32,
+    ) -> Self {
         let event_loop = winit::event_loop::EventLoop::new();
         let window = winit::window::WindowBuilder::new()
             .build(&event_loop)
             .unwrap();
-        let particles = particle::Particle::create_particles(num_particles);
+        let simulation = simulation::Simulation::new(num_particles, particle_mass, particle_radius);
         let (vertices, indices) =
-            vertex::VertexRaw::create_particles_vertices(particle_radius, particle_sides);
+            shader_types::VertexRaw::create_particles_vertices(particle_radius, particle_sides);
         let device = device::Device::new(&window).await;
-        let pipeline = pipeline::Pipeline::new(&particles, &vertices, &indices, &device);
+        let pipeline = pipeline::Pipeline::new(simulation, &vertices, &indices, &device);
 
         State {
             window,
             event_loop,
-            particles,
             device,
             pipeline,
         }
@@ -58,7 +60,7 @@ impl State {
                 winit::event::Event::RedrawRequested(window_id)
                     if window_id == self.window.id() =>
                 {
-                    self.pipeline.update(&mut self.particles, &self.device);
+                    self.pipeline.update(&self.device);
                     match self.pipeline.render(&self.device) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {

@@ -7,6 +7,9 @@ struct Args {
     #[arg(short = 'n', long, default_value_t = 10)]
     num_particles: u32,
 
+    #[arg(short = 'm', long, default_value_t = 1.0)]
+    particle_mass: f32,
+
     #[arg(short = 'r', long, default_value_t = 0.1)]
     particle_radius: f32,
 
@@ -20,6 +23,7 @@ async fn main() {
     let args = Args::parse();
     let state = state::State::new(
         args.num_particles,
+        args.particle_mass,
         args.particle_radius,
         args.particle_sides,
     )
