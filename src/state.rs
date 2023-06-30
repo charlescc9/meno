@@ -13,17 +13,18 @@ pub struct State {
 impl State {
     pub async fn new(
         num_particles: u32,
-        particle_mass: f32,
-        particle_radius: f32,
-        particle_sides: u32,
+        num_sides: u32,
+        max_mass: f32,
+        max_velocity: f32,
+        radius: f32,
     ) -> Self {
         let event_loop = winit::event_loop::EventLoop::new();
         let window = winit::window::WindowBuilder::new()
             .build(&event_loop)
             .unwrap();
-        let simulation = simulation::Simulation::new(num_particles, particle_mass, particle_radius);
+        let simulation = simulation::Simulation::new(num_particles, max_mass, max_velocity, radius);
         let (vertices, indices) =
-            shader_types::VertexRaw::create_particles_vertices(particle_radius, particle_sides);
+            shader_types::VertexRaw::create_particles_vertices(num_sides, radius);
         let device = device::Device::new(&window).await;
         let pipeline = pipeline::Pipeline::new(simulation, &vertices, &indices, &device);
 
