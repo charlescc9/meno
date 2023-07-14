@@ -1,11 +1,11 @@
-use nalgebra as na;
 use rand::Rng;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Particle {
     pub mass: f32,
     pub radius: f32,
-    pub position: na::Point3<f32>,
-    pub velocity: na::Vector3<f32>,
+    pub position: glm::Vec3,
+    pub velocity: glm::Vec3,
 }
 
 pub struct Simulation {
@@ -34,12 +34,12 @@ impl Simulation {
                 let new_particle = Particle {
                     mass: rng.gen_range(0.0..=max_mass),
                     radius,
-                    position: na::Point3::new(
+                    position: glm::vec3(
                         rng.gen_range(lower_limit..=upper_limit),
                         rng.gen_range(lower_limit..=upper_limit),
                         0.0,
                     ),
-                    velocity: na::Vector3::new(
+                    velocity: glm::vec3(
                         rng.gen_range(0.0..=max_velocity),
                         rng.gen_range(0.0..=max_velocity),
                         0.0,
@@ -61,12 +61,12 @@ impl Simulation {
     }
 
     pub fn step(&mut self) {
+        self.detect_particle_collisions();
         for particle in &mut self.particles {
+            self::Simulation::detect_wall_collision(particle);
             particle.position[0] += particle.velocity[0];
             particle.position[1] += particle.velocity[1];
-            self::Simulation::detect_wall_collision(particle);
         }
-        self.detect_particle_collisions();
     }
 
     fn detect_wall_collision(particle: &mut Particle) {
@@ -84,10 +84,28 @@ impl Simulation {
 
     fn detect_particle_collisions(&mut self) {
         for i in 0..self.particles.len() {
-            for j in 0..self.particles.len() {
-                if i != j && Self::detect_overlap(&self.particles[i], &self.particles[j]) {
-                    self.particles[i].velocity[0] *= -1.0;
-                    self.particles[i].velocity[1] *= -1.0;
+            for j in i + 1..self.particles.len() {
+                if Self::detect_overlap(&self.particles[i], &self.particles[j]) {
+                    let p1 = &self.particles[i];
+                    let p2 = &self.particles[j];
+                    let x1 = p1.position;
+                    let x2 = p2.position;
+                    let v1 = p1.velocity;
+                    let v2 = p2.velocity;
+
+                    let m1 = (2.0 * p2.mass) / (p1.mass + p2.mass);
+                    let m2 = (2.0 * p1.mass) / (p1.mass + p2.mass);
+                    let d1 = x1 - x2;
+                    let d2 = x2 - x1;
+
+                    let v1_new = v1 - ((m1 * glm::dot(&(v1 - v2), &d1)) / glm::length2(&d1)) * d1;
+                    let v2_new = v2 - ((m2 * glm::dot(&(v2 - v1), &d2)) / glm::length2(&d2)) * d2;
+
+                    let mut p = &mut self.particles[i];
+                    p.velocity = v1_new;
+
+                    p = &mut self.particles[j];
+                    p.velocity = v2_new;
                 }
             }
         }
@@ -97,6 +115,6 @@ impl Simulation {
         let delta_x = particle1.position.x - particle2.position.x;
         let delta_y = particle1.position.y - particle2.position.y;
         let dist = f32::sqrt(delta_x * delta_x + delta_y * delta_y);
-        dist <= particle1.radius + particle2.radius
+        dist < particle1.radius + particle2.radius
     }
 }

@@ -12,7 +12,7 @@ impl ParticleRaw {
     pub fn convert(particles: &Vec<simulation::Particle>, particles_raw: &mut Vec<ParticleRaw>) {
         let paricles_positions: Vec<[f32; 3]> = particles
             .iter()
-            .map(|p| p.position.coords.as_slice().try_into().unwrap())
+            .map(|p| p.position.as_slice().try_into().unwrap())
             .collect();
         let paricles_velocities: Vec<[f32; 3]> = particles
             .iter()

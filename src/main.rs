@@ -1,3 +1,4 @@
+extern crate nalgebra_glm as glm;
 use clap::Parser;
 mod state;
 
