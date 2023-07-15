@@ -13,14 +13,27 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(num_particles: u32, max_mass: f32, max_velocity: f32, radius: f32) -> Self {
+    pub fn new(
+        num_particles: u32,
+        min_mass: f32,
+        max_mass: f32,
+        max_velocity: f32,
+        radius: f32,
+    ) -> Self {
         Self {
-            particles: Self::create_particles(num_particles, max_mass, max_velocity, radius),
+            particles: Self::create_particles(
+                num_particles,
+                min_mass,
+                max_mass,
+                max_velocity,
+                radius,
+            ),
         }
     }
 
     fn create_particles(
         num_particles: u32,
+        min_mass: f32,
         max_mass: f32,
         max_velocity: f32,
         radius: f32,
@@ -32,7 +45,7 @@ impl Simulation {
                 let lower_limit = -1.0 + radius;
                 let upper_limit = 1.0 - radius;
                 let new_particle = Particle {
-                    mass: rng.gen_range(0.0..=max_mass),
+                    mass: rng.gen_range(min_mass..=max_mass),
                     radius,
                     position: glm::vec3(
                         rng.gen_range(lower_limit..=upper_limit),

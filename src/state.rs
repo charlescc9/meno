@@ -14,6 +14,7 @@ impl State {
     pub async fn new(
         num_particles: u32,
         num_sides: u32,
+        min_mass: f32,
         max_mass: f32,
         max_velocity: f32,
         radius: f32,
@@ -22,11 +23,13 @@ impl State {
         let window = winit::window::WindowBuilder::new()
             .build(&event_loop)
             .unwrap();
-        let simulation = simulation::Simulation::new(num_particles, max_mass, max_velocity, radius);
+        let simulation =
+            simulation::Simulation::new(num_particles, min_mass, max_mass, max_velocity, radius);
         let (vertices, indices) =
-            shader_types::VertexRaw::create_particles_vertices(num_sides, radius);
+            shader_types::VertexRaw::generate_shader_vertices(num_sides, radius);
         let device = device::Device::new(&window).await;
-        let pipeline = pipeline::Pipeline::new(simulation, &vertices, &indices, &device);
+        let pipeline =
+            pipeline::Pipeline::new(max_velocity, simulation, &vertices, &indices, &device);
 
         State {
             window,

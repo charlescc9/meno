@@ -6,6 +6,7 @@ use wgpu::util::DeviceExt;
 pub struct Pipeline {
     num_particles: u32,
     num_indices: u32,
+    max_velocity: f32,
     particles_raw: Vec<shader_types::ParticleRaw>,
     particle_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
@@ -16,13 +17,18 @@ pub struct Pipeline {
 
 impl Pipeline {
     fn create_buffers(
+        max_velocity: f32,
         device: &device::Device,
         particles: &Vec<simulation::Particle>,
         particles_raw: &mut Vec<shader_types::ParticleRaw>,
         vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
     ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
-        shader_types::ParticleRaw::convert(particles, particles_raw);
+        shader_types::ParticleRaw::generate_shader_particles(
+            max_velocity,
+            particles,
+            particles_raw,
+        );
         (
             device
                 .device
@@ -73,7 +79,7 @@ impl Pipeline {
             wgpu::VertexBufferLayout {
                 array_stride: std::mem::size_of::<shader_types::VertexRaw>() as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![2 => Float32x3, 3 => Float32x3],
+                attributes: &wgpu::vertex_attr_array![2 => Float32x3],
             },
         ];
         let render_pipeline =
@@ -101,6 +107,7 @@ impl Pipeline {
     }
 
     pub fn new(
+        max_velocity: f32,
         simulation: simulation::Simulation,
         vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
@@ -108,6 +115,7 @@ impl Pipeline {
     ) -> Self {
         let mut particles_raw = Vec::new();
         let (particle_buffer, vertex_buffer, index_buffer) = Pipeline::create_buffers(
+            max_velocity,
             &device,
             &simulation.particles,
             &mut particles_raw,
@@ -119,6 +127,7 @@ impl Pipeline {
         Self {
             num_particles: simulation.particles.len() as u32,
             num_indices: indices.len() as u32,
+            max_velocity,
             particles_raw,
             particle_buffer,
             vertex_buffer,
@@ -131,7 +140,11 @@ impl Pipeline {
     pub fn update(&mut self, device: &device::Device) {
         self.simulation.step();
 
-        shader_types::ParticleRaw::convert(&self.simulation.particles, &mut self.particles_raw);
+        shader_types::ParticleRaw::generate_shader_particles(
+            self.max_velocity,
+            &self.simulation.particles,
+            &mut self.particles_raw,
+        );
         device.queue.write_buffer(
             &self.particle_buffer,
             0,
@@ -157,9 +170,9 @@ impl Pipeline {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.5,
-                            g: 0.5,
-                            b: 0.5,
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
                             a: 1.0,
                         }),
                         store: true,
