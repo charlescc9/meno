@@ -1,11 +1,10 @@
 struct Particle {
     @location(0) position: vec3<f32>,
-    @location(1) velocity: vec3<f32>,
+    @location(1) color: vec3<f32>,
 }
 
 struct VertexInput {
     @location(2) offset: vec3<f32>,
-    @location(3) color: vec3<f32>,
 }
 
 struct VertexOutput {
@@ -18,7 +17,7 @@ fn main_vertex(particle: Particle, input_vertex: VertexInput) -> VertexOutput {
     var output_vertex: VertexOutput;
     output_vertex.clip_position = vec4<f32>(particle.position.x + input_vertex.offset.x, 
                                             particle.position.y + input_vertex.offset.y, 0.0, 1.0);
-    output_vertex.color = input_vertex.color;
+    output_vertex.color = particle.color;
     return output_vertex;
 }
 

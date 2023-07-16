@@ -1,35 +1,39 @@
 mod device;
-mod particle;
 mod pipeline;
+mod shader_types;
 mod simulation;
-mod vertex;
 
 pub struct State {
     event_loop: winit::event_loop::EventLoop<()>,
     window: winit::window::Window,
-    particles: Vec<particle::Particle>,
-    simulation: simulation::Simulation,
     device: device::Device,
     pipeline: pipeline::Pipeline,
 }
 
 impl State {
-    pub async fn new(num_particles: u32, particle_radius: f32, particle_sides: u32) -> Self {
+    pub async fn new(
+        num_particles: u32,
+        num_sides: u32,
+        min_mass: f32,
+        max_mass: f32,
+        max_velocity: f32,
+        radius: f32,
+    ) -> Self {
         let event_loop = winit::event_loop::EventLoop::new();
         let window = winit::window::WindowBuilder::new()
             .build(&event_loop)
             .unwrap();
-        let particles = particle::Particle::create_particles(num_particles);
-        let (vertices, indices) = vertex::Vertex::create_particles(particle_radius, particle_sides);
+        let simulation =
+            simulation::Simulation::new(num_particles, min_mass, max_mass, max_velocity, radius);
+        let (vertices, indices) =
+            shader_types::VertexRaw::generate_shader_vertices(num_sides, radius);
         let device = device::Device::new(&window).await;
-        let simulation = simulation::Simulation::new(&particles, particle_radius);
-        let pipeline = pipeline::Pipeline::new(&particles, &vertices, &indices, &device);
+        let pipeline =
+            pipeline::Pipeline::new(max_velocity, simulation, &vertices, &indices, &device);
 
         State {
             window,
             event_loop,
-            particles,
-            simulation,
             device,
             pipeline,
         }
@@ -60,8 +64,7 @@ impl State {
                 winit::event::Event::RedrawRequested(window_id)
                     if window_id == self.window.id() =>
                 {
-                    self.pipeline
-                        .update(&mut self.particles, &self.device, &mut self.simulation);
+                    self.pipeline.update(&self.device);
                     match self.pipeline.render(&self.device) {
                         Ok(_) => {}
                         Err(wgpu::SurfaceError::Lost) => {
