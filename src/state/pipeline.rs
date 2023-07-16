@@ -1,32 +1,40 @@
 use super::device;
-use super::particle;
+use super::shader_types;
 use super::simulation;
-use super::vertex;
-use rapier2d::prelude::*;
 use wgpu::util::DeviceExt;
 
 pub struct Pipeline {
     num_particles: u32,
     num_indices: u32,
+    max_velocity: f32,
+    particles_raw: Vec<shader_types::ParticleRaw>,
     particle_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     render_pipeline: wgpu::RenderPipeline,
+    simulation: simulation::Simulation,
 }
 
 impl Pipeline {
     fn create_buffers(
+        max_velocity: f32,
         device: &device::Device,
-        particles: &Vec<particle::Particle>,
-        vertices: &Vec<vertex::Vertex>,
+        particles: &Vec<simulation::Particle>,
+        particles_raw: &mut Vec<shader_types::ParticleRaw>,
+        vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
     ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer) {
+        shader_types::ParticleRaw::generate_shader_particles(
+            max_velocity,
+            particles,
+            particles_raw,
+        );
         (
             device
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Particle Buffer"),
-                    contents: bytemuck::cast_slice(&particles),
+                    contents: bytemuck::cast_slice(particles_raw),
                     usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 }),
             device
@@ -63,14 +71,15 @@ impl Pipeline {
                 });
         let vertex_buffer_layout = &[
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<particle::Particle>() as wgpu::BufferAddress,
+                array_stride: std::mem::size_of::<shader_types::ParticleRaw>()
+                    as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Instance,
                 attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3],
             },
             wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<vertex::Vertex>() as wgpu::BufferAddress,
+                array_stride: std::mem::size_of::<shader_types::VertexRaw>() as wgpu::BufferAddress,
                 step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &wgpu::vertex_attr_array![2 => Float32x3, 3 => Float32x3],
+                attributes: &wgpu::vertex_attr_array![2 => Float32x3],
             },
         ];
         let render_pipeline =
@@ -98,65 +107,49 @@ impl Pipeline {
     }
 
     pub fn new(
-        particles: &Vec<particle::Particle>,
-        vertices: &Vec<vertex::Vertex>,
+        max_velocity: f32,
+        simulation: simulation::Simulation,
+        vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
         device: &device::Device,
     ) -> Self {
-        let (particle_buffer, vertex_buffer, index_buffer) =
-            Pipeline::create_buffers(&device, &particles, &vertices, &indices);
+        let mut particles_raw = Vec::new();
+        let (particle_buffer, vertex_buffer, index_buffer) = Pipeline::create_buffers(
+            max_velocity,
+            &device,
+            &simulation.particles,
+            &mut particles_raw,
+            &vertices,
+            &indices,
+        );
         let render_pipeline = Pipeline::create_render_pipeline(&device);
 
         Self {
-            num_particles: particles.len() as u32,
+            num_particles: simulation.particles.len() as u32,
             num_indices: indices.len() as u32,
+            max_velocity,
+            particles_raw,
             particle_buffer,
             vertex_buffer,
             index_buffer,
             render_pipeline,
+            simulation,
         }
     }
 
-    pub fn update(
-        &self,
-        particles: &mut Vec<particle::Particle>,
-        device: &device::Device,
-        simulation: &mut simulation::Simulation,
-    ) {
-        simulation.physics_pipeline.step(
-            &vector![0.0, simulation.gravity],
-            &simulation.integration_parameters,
-            &mut simulation.island_manager,
-            &mut simulation.broad_phase,
-            &mut simulation.narrow_phase,
-            &mut simulation.rigid_body_set,
-            &mut simulation.collider_set,
-            &mut simulation.impulse_joint_set,
-            &mut simulation.multibody_joint_set,
-            &mut simulation.ccd_solver,
-            None,
-            &(),
-            &(),
+    pub fn update(&mut self, device: &device::Device) {
+        self.simulation.step();
+
+        shader_types::ParticleRaw::generate_shader_particles(
+            self.max_velocity,
+            &self.simulation.particles,
+            &mut self.particles_raw,
         );
-
-        let mut total_p = 0.0;
-        for i in 0..simulation.rigid_body_handles.len() {
-            let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
-            particles[i].position[0] = rigid_body.translation().x;
-            particles[i].position[1] = rigid_body.translation().y;
-
-            let rigid_body = &simulation.rigid_body_set[simulation.rigid_body_handles[i]];
-            println!("mass: {:?}", rigid_body.mass());
-            println!("linvel: {}", rigid_body.linvel().magnitude());
-            println!("angvel: {}", rigid_body.angvel());
-            println!("kinetic enegery: {}", rigid_body.kinetic_energy());
-            total_p += rigid_body.linvel().magnitude();
-        }
-        println!("Total: {}\n", total_p);
-
-        device
-            .queue
-            .write_buffer(&self.particle_buffer, 0, bytemuck::cast_slice(&particles));
+        device.queue.write_buffer(
+            &self.particle_buffer,
+            0,
+            bytemuck::cast_slice(&self.particles_raw),
+        );
     }
 
     pub fn render(&self, device: &device::Device) -> Result<(), wgpu::SurfaceError> {
@@ -177,9 +170,9 @@ impl Pipeline {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.5,
-                            g: 0.5,
-                            b: 0.5,
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
                             a: 1.0,
                         }),
                         store: true,
