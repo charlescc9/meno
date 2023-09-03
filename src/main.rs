@@ -17,7 +17,7 @@ struct Args {
     #[arg(short = 'm', long, default_value_t = 1.0)]
     max_mass: f32,
 
-    #[arg(short = 'v', long, default_value_t = 0.02)]
+    #[arg(short = 'v', long, default_value_t = 0.015)]
     max_velocity: f32,
 
     #[arg(short = 'r', long, default_value_t = 0.1)]
