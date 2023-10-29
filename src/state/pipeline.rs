@@ -1,6 +1,6 @@
-use super::camera;
 use super::device;
 use super::simulation;
+use crate::state::camera::Camera;
 use std::f32::consts::TAU;
 use wgpu::util::DeviceExt;
 
@@ -17,11 +17,29 @@ pub struct VertexRaw {
     pub offset: [f32; 3],
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CameraMatrix {
+    pub matrix: [[f32; 4]; 4],
+}
+
+impl CameraMatrix {
+    fn new() -> Self {
+        Self {
+            matrix: glm::Mat4::identity().into(),
+        }
+    }
+
+    fn update_camera_matrix(&mut self, camera: &Camera) {
+        self.matrix = camera.generate_camera_matrix().into();
+    }
+}
+
 pub struct Pipeline {
     num_particles: u32,
     num_indices: u32,
     max_velocity: f32,
-    camera_raw: Vec<camera::CameraRaw>,
+    camera_matrix: CameraMatrix,
     particles_raw: Vec<ParticleRaw>,
     particle_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
@@ -38,7 +56,7 @@ impl Pipeline {
         particles: &Vec<simulation::Particle>,
         particles_raw: &mut Vec<ParticleRaw>,
     ) {
-        let paricles_positions: Vec<[f32; 3]> = particles
+        let particle_positions: Vec<[f32; 3]> = particles
             .iter()
             .map(|p| p.position.as_slice().try_into().unwrap())
             .collect();
@@ -54,11 +72,11 @@ impl Pipeline {
             .collect();
         for i in 0..particles.len() {
             if particles_raw.len() > i {
-                particles_raw[i].position = paricles_positions[i];
+                particles_raw[i].position = particle_positions[i];
                 particles_raw[i].color = particles_colors[i];
             } else {
                 particles_raw.push(ParticleRaw {
-                    position: paricles_positions[i],
+                    position: particle_positions[i],
                     color: particles_colors[i],
                 })
             }
@@ -83,26 +101,10 @@ impl Pipeline {
         (vertices, indices)
     }
 
-    pub fn generate_view_projection_matrix(camera: &camera::Camera) -> Vec<camera::CameraRaw> {
-        let view = glm::look_at_lh(&camera.eye, &camera.target, &camera.up);
-        let projection = glm::perspective(camera.fovy, camera.aspect, camera.znear, camera.zfar);
-        #[rustfmt::skip]
-        let opengl_to_wgpu = glm::mat4(
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 0.5, 0.0,
-            0.0, 0.0, 0.5, 1.0,
-        );
-        let view_projection = (opengl_to_wgpu * projection * view).into();
-
-        vec![camera::CameraRaw { view_projection }]
-    }
-
     fn create_buffers(
         max_velocity: f32,
         device: &device::Device,
-        camera: &camera::Camera,
-        camera_raw: &Vec<camera::CameraRaw>,
+        camera_matrix: &CameraMatrix,
         particles: &Vec<simulation::Particle>,
         particles_raw: &mut Vec<ParticleRaw>,
         vertices: &Vec<VertexRaw>,
@@ -135,7 +137,7 @@ impl Pipeline {
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Camera Buffer"),
-                    contents: bytemuck::cast_slice(camera_raw),
+                    contents: bytemuck::cast_slice(&[camera_matrix.matrix]),
                     usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                 }),
         )
@@ -234,16 +236,16 @@ impl Pipeline {
         vertices: &Vec<VertexRaw>,
         indices: &Vec<u32>,
         device: &device::Device,
-        camera: &camera::Camera,
     ) -> Self {
         let mut particles_raw = Vec::new();
-        let camera_raw = Pipeline::generate_view_projection_matrix(camera);
+
+        let mut camera_matrix = CameraMatrix::new();
+        camera_matrix.update_camera_matrix(&device.camera);
         let (particle_buffer, vertex_buffer, index_buffer, camera_buffer) =
             Pipeline::create_buffers(
                 max_velocity,
                 &device,
-                &camera,
-                &camera_raw,
+                &camera_matrix,
                 &simulation.particles,
                 &mut particles_raw,
                 &vertices,
@@ -251,13 +253,14 @@ impl Pipeline {
             );
         let (camera_bind_group_layout, camera_bind_group) =
             Pipeline::create_camera_bind_group(&device, &camera_buffer);
+
         let render_pipeline = Pipeline::create_render_pipeline(&device, &camera_bind_group_layout);
 
         Self {
             num_particles: simulation.particles.len() as u32,
             num_indices: indices.len() as u32,
             max_velocity,
-            camera_raw,
+            camera_matrix,
             particles_raw,
             particle_buffer,
             vertex_buffer,
@@ -267,9 +270,9 @@ impl Pipeline {
             render_pipeline,
             simulation,
         }
-    } 
+    }
 
-    pub fn update(&mut self, device: &device::Device) {
+    pub fn update(&mut self, device: &mut device::Device) {
         self.simulation.step();
 
         Pipeline::generate_shader_particles(
@@ -285,8 +288,16 @@ impl Pipeline {
         device.queue.write_buffer(
             &self.camera_buffer,
             0,
-            bytemuck::cast_slice(&self.camera_raw),
+            bytemuck::cast_slice(&self.camera_matrix.matrix),
         );
+
+        device.update_camera();
+        self.camera_matrix.update_camera_matrix(&device.camera);
+        device.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_matrix.matrix]),
+        )
     }
 
     pub fn render(&self, device: &device::Device) -> Result<(), wgpu::SurfaceError> {
