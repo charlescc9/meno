@@ -1,15 +1,54 @@
+use rand::rngs::ThreadRng;
 use rand::Rng;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Particle {
-    pub mass: f32,
-    pub radius: f32,
-    pub position: glm::Vec3,
-    pub velocity: glm::Vec3,
+    mass: f32,
+    radius: f32,
+    position: glm::Vec3,
+    velocity: glm::Vec3,
 }
 
 pub struct Simulation {
     pub particles: Vec<Particle>,
+}
+
+impl Particle {
+    fn new(
+        rng: &mut ThreadRng,
+        min_mass: f32,
+        max_mass: f32,
+        max_velocity: f32,
+        lower_limit: f32,
+        upper_limit: f32,
+        radius: f32,
+    ) -> Self {
+        Self {
+            mass: rng.gen_range(min_mass..=max_mass),
+            radius,
+            position: glm::vec3(
+                rng.gen_range(lower_limit..=upper_limit),
+                rng.gen_range(lower_limit..=upper_limit),
+                0.0,
+            ),
+            velocity: glm::vec3(
+                rng.gen_range(0.0..=max_velocity),
+                rng.gen_range(0.0..=max_velocity),
+                0.0,
+            ),
+        }
+    }
+
+    pub fn to_shader(&self, max_velocity: f32) -> (glm::Vec3, glm::Vec3) {
+        (
+            self.position,
+            glm::vec3(
+                1.0 - self.velocity.magnitude() / max_velocity,
+                0.0,
+                f32::min(self.velocity.magnitude() / max_velocity, 1.0),
+            ),
+        )
+    }
 }
 
 impl Simulation {
@@ -20,44 +59,21 @@ impl Simulation {
         max_velocity: f32,
         radius: f32,
     ) -> Self {
-        Self {
-            particles: Self::create_particles(
-                num_particles,
-                min_mass,
-                max_mass,
-                max_velocity,
-                radius,
-            ),
-        }
-    }
-
-    fn create_particles(
-        num_particles: u32,
-        min_mass: f32,
-        max_mass: f32,
-        max_velocity: f32,
-        radius: f32,
-    ) -> Vec<Particle> {
         let mut particles = Vec::new();
         let mut rng = rand::thread_rng();
+        let lower_limit = -1.0 + radius;
+        let upper_limit = 1.0 - radius;
         for _ in 0..num_particles {
             loop {
-                let lower_limit = -1.0 + radius;
-                let upper_limit = 1.0 - radius;
-                let new_particle = Particle {
-                    mass: rng.gen_range(min_mass..=max_mass),
+                let new_particle = Particle::new(
+                    &mut rng,
+                    min_mass,
+                    max_mass,
+                    max_velocity,
+                    lower_limit,
+                    upper_limit,
                     radius,
-                    position: glm::vec3(
-                        rng.gen_range(lower_limit..=upper_limit),
-                        rng.gen_range(lower_limit..=upper_limit),
-                        0.0,
-                    ),
-                    velocity: glm::vec3(
-                        rng.gen_range(0.0..=max_velocity),
-                        rng.gen_range(0.0..=max_velocity),
-                        0.0,
-                    ),
-                };
+                );
                 let mut in_collision = false;
                 for particle in &particles {
                     if Self::detect_overlap(&new_particle, &particle) {
@@ -70,13 +86,14 @@ impl Simulation {
                 }
             }
         }
-        particles
+
+        Self { particles }
     }
 
     pub fn step(&mut self) {
         self.detect_particle_collisions();
         for particle in &mut self.particles {
-            self::Simulation::detect_wall_collision(particle);
+            Simulation::detect_wall_collision(particle);
             particle.position[0] += particle.velocity[0];
             particle.position[1] += particle.velocity[1];
         }
@@ -84,12 +101,12 @@ impl Simulation {
 
     fn detect_wall_collision(particle: &mut Particle) {
         if particle.position.x - particle.radius < -1.0
-            || particle.position.x + particle.radius > 1.0 as f32
+            || particle.position.x + particle.radius > 1.0f32
         {
             particle.velocity[0] *= -1.0;
         }
         if particle.position.y - particle.radius < -1.0
-            || particle.position.y + particle.radius > 1.0 as f32
+            || particle.position.y + particle.radius > 1.0f32
         {
             particle.velocity[1] *= -1.0;
         }
