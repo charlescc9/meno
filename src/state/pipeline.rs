@@ -1,7 +1,20 @@
-use super::device;
+use wgpu::util::DeviceExt;
+use wgpu::BlendState;
+use wgpu::ColorTargetState;
+use wgpu::ColorWrites;
+use wgpu::Device;
+use wgpu::FragmentState;
+use wgpu::PipelineCompilationOptions;
+use wgpu::Queue;
+use wgpu::RenderPassDescriptor;
+use wgpu::RenderPipelineDescriptor;
+use wgpu::StoreOp;
+use wgpu::Surface;
+use wgpu::TextureFormat;
+use wgpu::VertexState;
+
 use super::shader_types;
 use super::simulation;
-use wgpu::util::DeviceExt;
 
 pub struct Pipeline {
     num_particles: u32,
@@ -18,7 +31,7 @@ pub struct Pipeline {
 impl Pipeline {
     fn create_buffers(
         max_velocity: f32,
-        device: &device::Device,
+        device: &Device,
         particles: &Vec<simulation::Particle>,
         particles_raw: &mut Vec<shader_types::ParticleRaw>,
         vertices: &Vec<shader_types::VertexRaw>,
@@ -30,45 +43,32 @@ impl Pipeline {
             particles_raw,
         );
         (
-            device
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Particle Buffer"),
-                    contents: bytemuck::cast_slice(particles_raw),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                }),
-            device
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                }),
-            device
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Index Buffer"),
-                    contents: bytemuck::cast_slice(indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                }),
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Particle Buffer"),
+                contents: bytemuck::cast_slice(particles_raw),
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            }),
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }),
+            device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }),
         )
     }
 
-    fn create_render_pipeline(device: &device::Device) -> wgpu::RenderPipeline {
-        let render_shader = device
-            .device
-            .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Render Shader"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-            });
+    fn create_render_pipeline(device: &Device, format: &TextureFormat) -> wgpu::RenderPipeline {
+        let render_shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
         let render_pipeline_layout =
-            device
-                .device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[],
-                    push_constant_ranges: &[],
-                });
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
         let vertex_buffer_layout = &[
             wgpu::VertexBufferLayout {
                 array_stride: std::mem::size_of::<shader_types::ParticleRaw>()
@@ -82,27 +82,31 @@ impl Pipeline {
                 attributes: &wgpu::vertex_attr_array![2 => Float32x3],
             },
         ];
-        let render_pipeline =
-            device
-                .device
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("Render Pipeline"),
-                    layout: Some(&render_pipeline_layout),
-                    vertex: wgpu::VertexState {
-                        module: &render_shader,
-                        entry_point: "main_vertex",
-                        buffers: vertex_buffer_layout,
-                    },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &render_shader,
-                        entry_point: "main_fragment",
-                        targets: &[Some(device.surface_format.into())],
-                    }),
-                    primitive: wgpu::PrimitiveState::default(),
-                    depth_stencil: None,
-                    multisample: wgpu::MultisampleState::default(),
-                    multiview: None,
-                });
+        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: VertexState {
+                module: &render_shader,
+                entry_point: "main_vertex",
+                buffers: vertex_buffer_layout,
+                compilation_options: PipelineCompilationOptions::default(),
+            },
+            fragment: Some(FragmentState {
+                module: &render_shader,
+                entry_point: "main_fragment",
+                targets: &[Some(ColorTargetState {
+                    format: *format,
+                    blend: Some(BlendState::REPLACE),
+                    write_mask: ColorWrites::ALL,
+                })],
+                compilation_options: PipelineCompilationOptions::default(),
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        });
         render_pipeline
     }
 
@@ -111,7 +115,8 @@ impl Pipeline {
         simulation: simulation::Simulation,
         vertices: &Vec<shader_types::VertexRaw>,
         indices: &Vec<u32>,
-        device: &device::Device,
+        device: &Device,
+        format: &TextureFormat,
     ) -> Self {
         let mut particles_raw = Vec::new();
         let (particle_buffer, vertex_buffer, index_buffer) = Pipeline::create_buffers(
@@ -122,7 +127,7 @@ impl Pipeline {
             &vertices,
             &indices,
         );
-        let render_pipeline = Pipeline::create_render_pipeline(&device);
+        let render_pipeline = Pipeline::create_render_pipeline(device, format);
 
         Self {
             num_particles: simulation.particles.len() as u32,
@@ -137,7 +142,7 @@ impl Pipeline {
         }
     }
 
-    pub fn update(&mut self, device: &device::Device) {
+    pub fn update(&mut self, queue: &Queue) {
         self.simulation.step();
 
         shader_types::ParticleRaw::generate_shader_particles(
@@ -145,25 +150,28 @@ impl Pipeline {
             &self.simulation.particles,
             &mut self.particles_raw,
         );
-        device.queue.write_buffer(
+        queue.write_buffer(
             &self.particle_buffer,
             0,
             bytemuck::cast_slice(&self.particles_raw),
         );
     }
 
-    pub fn render(&self, device: &device::Device) -> Result<(), wgpu::SurfaceError> {
-        let frame = device.surface.get_current_texture()?;
+    pub fn render(
+        &self,
+        device: &Device,
+        surface: &Surface,
+        queue: &Queue,
+    ) -> Result<(), wgpu::SurfaceError> {
+        let frame = surface.get_current_texture()?;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = device
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
         {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -175,10 +183,12 @@ impl Pipeline {
                             b: 0.0,
                             a: 1.0,
                         }),
-                        store: true,
+                        store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_vertex_buffer(0, self.particle_buffer.slice(..));
@@ -187,7 +197,7 @@ impl Pipeline {
             render_pass.draw_indexed(0..self.num_indices, 0, 0..self.num_particles);
         }
 
-        device.queue.submit(std::iter::once(encoder.finish()));
+        queue.submit(std::iter::once(encoder.finish()));
         frame.present();
         Ok(())
     }
