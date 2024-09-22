@@ -2,17 +2,12 @@
 name = "meno"
 version = "0.1.0"
 edition = "2021"
-description = "A fundamental physics simulator"
+description = "TODO"
 
 [dependencies]
-clap = { version = "*", features = ["derive"] }
-rand = "*"
+bytemuck = { version = "1.16", features = [ "derive" ] }
+tokio = { version = "*", features = ["full"] }
 tracing = "*"
 tracing-subscriber = "*"
 wgpu = "*"
 winit = { version = "0.29", features = ["rwh_05"] }
-tokio = { version = "*", features = ["full"] }
-bytemuck = { version = "*", features = ["derive"] }
-nalgebra = "*"
-nalgebra-glm = "*"
-itertools = "*"
